@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  db:
+    image: mysql:8.0.32
+    container_name: fake_db
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_USER: dev
+      MYSQL_PASSWORD: dev
+      MYSQL_DATABASE: fake_db
+    ports:
+      - "3306:3306"  # Changed to MySQL default port
+    volumes:
+      - mysql_data:/var/lib/mysql  # Changed to use MySQL data directory
+
+  adminer:
+    image: adminer
+    container_name: fake_db_adminer
+    ports:
+      - "9006:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: db
+    depends_on:
+      - db
+
+volumes:
+  mysql_data:  # Changed from postgres_data to mysql_data
