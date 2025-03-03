@@ -11,6 +11,8 @@ from models import (
     User, Personnel, Organization, Conversation, 
     Message, Tag, MessageTag, Userprompt
 )
+# Import predefined values
+from value import role_type, employee_type, organization_type
 
 SET_LOCALE="ja"
 
@@ -99,51 +101,26 @@ def generate_personnel(db, count=500):
         print("No organizations found. Please generate organizations first.")
         return 0
     
-    # Japanese specific options if Japanese locale is selected
-    ja_organization_types = ["企業", "支社", "部門", None]
-    ja_employee_types = ["正社員", "パートタイム", "契約社員", None]
-    ja_role_types = ["マネージャー", "ディレクター", "アソシエイト", "アナリスト", None]
-    ja_boolean = ["はい", "いいえ", None]
-        
     inserted_count = 0
     for _ in range(count):
         try:
             username = fake.unique.user_name()
             
-            if fake == fake_ja:
-                # Japanese data
-                personnel = Personnel(
-                    external_username=username,
-                    entry_year=random.randint(1980, 2025),
-                    department_code=random.choice(dept_codes),
-                    branch_code=fake.bothify(text="###"),
-                    head_office_name=fake.company(),
-                    branch_name=fake.city(),
-                    section_name=fake.company_prefix(),
-                    sales_office_name=random.choice([fake.company_suffix(), None]),
-                    organization_type=random.choice(ja_organization_types),
-                    employee_type=random.choice(ja_employee_types),
-                    role_type=random.choice(ja_role_types),
-                    is_organization_head=random.choice(ja_boolean),
-                    is_department_head=random.choice(ja_boolean)
-                )
-            else:
-                # English data
-                personnel = Personnel(
-                    external_username=username,
-                    entry_year=random.randint(1980, 2025),
-                    department_code=random.choice(dept_codes),
-                    branch_code=fake.bothify(text="###"),
-                    head_office_name=fake.company(),
-                    branch_name=fake.city(),
-                    section_name=fake.bs(),
-                    sales_office_name=random.choice([fake.company_suffix(), None]),
-                    organization_type=random.choice(["Corporate", "Branch", "Department", None]),
-                    employee_type=random.choice(["Full-time", "Part-time", "Contract", None]),
-                    role_type=random.choice(["Manager", "Director", "Associate", "Analyst", None]),
-                    is_organization_head=random.choice(["Yes", "No", None]),
-                    is_department_head=random.choice(["Yes", "No", None])
-                )
+            personnel = Personnel(
+                external_username=username,
+                entry_year=random.randint(1980, 2025),
+                department_code=random.choice(dept_codes),
+                branch_code=fake.bothify(text="###"),
+                head_office_name=fake.company(),
+                branch_name=fake.city(),
+                section_name=fake.company_prefix() if fake == fake_ja else fake.bs(),
+                sales_office_name=random.choice([fake.company_suffix(), None]),
+                organization_type=random.choice(organization_type + [None]),
+                employee_type=random.choice(employee_type + [None]),
+                role_type=random.choice(role_type + [None]),
+                is_organization_head=random.choice(["はい", "いいえ", None]) if fake == fake_ja else random.choice(["Yes", "No", None]),
+                is_department_head=random.choice(["はい", "いいえ", None]) if fake == fake_ja else random.choice(["Yes", "No", None])
+            )
             db.add(personnel)
             db.commit()
             inserted_count += 1
@@ -178,7 +155,7 @@ def generate_users(db, count=500):
             user = User(
                 external_id=1000 + i,
                 external_id_delete_flag=random.choice([True, False]),
-                username=username,  # Always provide a valid username
+                username=username,
                 created_at=fake.date_time_between(start_date='-2y', end_date='now')
             )
             db.add(user)
@@ -213,7 +190,7 @@ def generate_conversations(db, count=500):
                 user_id=random.choice(users).external_id,
                 topic=fake.sentence(),
                 created_at=fake.date_time_between(start_date='-1y', end_date='now'),
-                model_id=random.randint(1, 5)
+                model_id=random.randint(3, 5)  # Updated to use only model_id 3 to 5
             )
             db.add(conversation)
             db.commit()
@@ -246,18 +223,20 @@ def generate_messages(db, count=500):
     en_models = ["gpt-3.5-turbo", "gpt-4", "claude-3-sonnet"]
     
     inserted_count = 0
-    # Generate approximately 30 messages per conversation
+    # Generate messages for each conversation, ensuring at least 2 messages per conversation
     for conversation in conversations:
-        # Generate between 20-40 messages per conversation
-        message_count = 10
+        # Generate between 2 and 10 pairs of messages (user + bot)
+        message_pairs = random.randint(1, 5)  # Will result in 2-10 total messages
         
         # Get user associated with this conversation
         user = db.query(User).filter(User.external_id == conversation.user_id).first()
         if not user:
             continue
+        
+        current_time = conversation.created_at
             
-        # Generate a sequence of messages for this conversation
-        for i in range(message_count):
+        # Generate pairs of user and bot messages for this conversation
+        for pair in range(message_pairs):
             try:
                 # Create fake chat parameters
                 if fake == fake_ja:
@@ -275,25 +254,40 @@ def generate_messages(db, count=500):
                         "model": random.choice(en_models)
                     }
                 
-                # Alternate between user and bot messages
-                is_bot = (i % 2 == 1)
+                # 1. First add user message
+                if pair > 0:  # Not the first message pair
+                    # Gap between previous bot response and next user question (1-10 minutes)
+                    current_time += timedelta(minutes=random.randint(1, 10))
                 
-                # Calculate a timestamp that increases with each message
-                msg_time_delta = timedelta(minutes=random.randint(1, 15) * i)
-                msg_timestamp = conversation.created_at + msg_time_delta
-                
-                message = Message(
+                user_message = Message(
                     external_id=3000 + inserted_count,
                     conversation_id=conversation.external_id,
                     message=fake.paragraph(),
-                    is_bot=is_bot,
+                    is_bot=False,  # User message
                     sender_id=user.external_id,
                     chat_parameter=chat_params,
-                    created_at=msg_timestamp
+                    created_at=current_time
                 )
-                db.add(message)
+                db.add(user_message)
                 db.commit()
                 inserted_count += 1
+                
+                # 2. Then add bot response (5-30 seconds after user message)
+                current_time += timedelta(seconds=random.randint(5, 30))
+                
+                bot_message = Message(
+                    external_id=3000 + inserted_count,
+                    conversation_id=conversation.external_id,
+                    message=fake.paragraph(nb_sentences=3),
+                    is_bot=True,  # Bot message
+                    sender_id=user.external_id,
+                    chat_parameter=chat_params,
+                    created_at=current_time
+                )
+                db.add(bot_message)
+                db.commit()
+                inserted_count += 1
+                
                 if inserted_count % 100 == 0:
                     print(f"Inserted {inserted_count} messages")
             except IntegrityError:
