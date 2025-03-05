@@ -100,8 +100,10 @@ def generate_organizations(db, count=500):
     """Generate organization records."""
     print(f"Generating {count} organizations...")
     
+    # Import predefined values for field and field_detail
+    from value import field, field_detail
+    
     # Japanese organization types if Japanese locale is selected
-    ja_organization_types = ["企業", "支社", "部門", None]
     ja_regions = ["東京", "大阪", "名古屋", "福岡", "札幌", "仙台", "広島", "京都", None]
     
     inserted_count = 0
@@ -111,14 +113,17 @@ def generate_organizations(db, count=500):
             division_code = fake.bothify(text="###")
             section_code = fake.bothify(text="##")
             
+            # Select a random index to get matching field and field_detail pairs
+            field_index = random.randint(0, len(field) - 1)
+            
             if fake == fake_ja:
                 # Japanese data
                 org = Organization(
                     external_department_code=dept_code,
                     external_division_code=division_code,
                     external_section_code=section_code,
-                    field=random.choice([fake.company_prefix(), None]),
-                    field_detail=random.choice([fake.company_suffix(), None]),
+                    field=field[field_index],  # Use the predefined field value
+                    field_detail=field_detail[field_index],  # Use the matching field_detail value
                     region=random.choice(ja_regions),
                     branch=random.choice([fake.city(), None]),
                     abbreviation=random.choice([fake.first_kana_name()[:2], None]),
@@ -130,8 +135,8 @@ def generate_organizations(db, count=500):
                     external_department_code=dept_code,
                     external_division_code=division_code,
                     external_section_code=section_code,
-                    field=random.choice([fake.bs(), None]),
-                    field_detail=random.choice([fake.catch_phrase(), None]),
+                    field=field[field_index],  # Use the predefined field value
+                    field_detail=field_detail[field_index],  # Use the matching field_detail value
                     region=random.choice([fake.country(), None]),
                     branch=random.choice([fake.city(), None]),
                     abbreviation=random.choice([fake.language_code(), None]),
