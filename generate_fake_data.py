@@ -9,7 +9,7 @@ import argparse
 from connect import get_db, engine, Base
 from models import (
     User, Personnel, Organization, Conversation, 
-    Message, Tag, MessageTag, Userprompt
+    Message, Tag, MessageTag, Userprompt, EmployeeType, RoleType, OrganizationType
 )
 # Import predefined values
 from value import role_type, employee_type, organization_type
@@ -35,6 +35,66 @@ def create_tables():
     """Create tables in database if they don't exist."""
     Base.metadata.create_all(bind=engine)
     print("Tables created successfully.")
+
+def generate_role_types(db):
+    """Generate role type records from predefined values."""
+    print("Generating role types...")
+    
+    inserted_count = 0
+    for rt in role_type:
+        try:
+            role = RoleType(role_type=rt)
+            db.add(role)
+            db.commit()
+            inserted_count += 1
+        except IntegrityError:
+            db.rollback()
+        except Exception as e:
+            db.rollback()
+            print(f"Error inserting role type: {str(e)}")
+    
+    print(f"Successfully inserted {inserted_count} role types")
+    return inserted_count
+
+def generate_employee_types(db):
+    """Generate employee type records from predefined values."""
+    print("Generating employee types...")
+    
+    inserted_count = 0
+    for et in employee_type:
+        try:
+            emp_type = EmployeeType(employee_type=et)
+            db.add(emp_type)
+            db.commit()
+            inserted_count += 1
+        except IntegrityError:
+            db.rollback()
+        except Exception as e:
+            db.rollback()
+            print(f"Error inserting employee type: {str(e)}")
+    
+    print(f"Successfully inserted {inserted_count} employee types")
+    return inserted_count
+
+def generate_organization_types(db):
+    """Generate organization type records from predefined values."""
+    print("Generating organization types...")
+    
+    inserted_count = 0
+    for ot in organization_type:
+        try:
+            org_type = OrganizationType(organization_type=ot)
+            db.add(org_type)
+            db.commit()
+            inserted_count += 1
+        except IntegrityError:
+            db.rollback()
+        except Exception as e:
+            db.rollback()
+            print(f"Error inserting organization type: {str(e)}")
+    
+    print(f"Successfully inserted {inserted_count} organization types")
+    return inserted_count
 
 def generate_organizations(db, count=500):
     """Generate organization records."""
@@ -429,7 +489,9 @@ def generate_all_fake_data(locale='en'):
         create_tables()
         
         # Generate data in the correct order to maintain relationships
-        # generate_role_types(db)
+        generate_role_types(db)
+        generate_employee_types(db)
+        generate_organization_types(db)
         generate_organizations(db)
         generate_personnel(db)
         generate_users(db)
