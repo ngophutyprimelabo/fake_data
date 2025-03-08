@@ -1,11 +1,10 @@
 from datetime import datetime, timedelta
 from typing import Optional
 
-from connect import Base
+from core.database import Base
 from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, column_property, mapped_column, relationship
 from sqlalchemy.sql import func, select, text
-from sqlalchemy import Index
 
 
 class Message(Base):
@@ -40,6 +39,7 @@ class Conversation(Base):
     topic: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     model_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    display_flag: Mapped[bool] = mapped_column(Boolean, nullable=False)
 
     user = relationship(
         "User",
@@ -98,13 +98,16 @@ class User(Base):
     )
     external_id_delete_flag: Mapped[bool] = mapped_column(Boolean, nullable=False)
     username: Mapped[Optional[str]] = mapped_column(
-        String(150), ForeignKey("personnels.external_username"), unique=True, nullable=False
+        String(150), unique=True, nullable=False,
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False
     )
     personnel = relationship(
-        "Personnel", foreign_keys=[username], backref="user"
+        "Personnel",
+        primaryjoin="User.username==foreign(Personnel.external_username)",
+        backref="users",
+        lazy="joined"
     )
 
 
@@ -130,6 +133,13 @@ class Personnel(Base):
     is_organization_head: Mapped[Optional[str]] = mapped_column(String(255))
     is_department_head: Mapped[Optional[str]] = mapped_column(String(255))
 
+    organization = relationship(
+        "Organization",
+        foreign_keys=[department_code],
+        backref="personnels",
+        lazy="joined",
+    )
+
 
 class Organization(Base):
     __tablename__ = "organizations"
@@ -148,6 +158,10 @@ class Organization(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False
     )
+
+    @property
+    def field_mapping(self):
+        return f"{self.field} {self.field_detail}"
 
 
 class Userprompt(Base):

@@ -9,7 +9,7 @@ import argparse
 from connect import get_db, engine, Base
 from models import (
     User, Personnel, Organization, Conversation, 
-    Message, Tag, MessageTag, Userprompt, EmployeeType, RoleType, OrganizationType
+    Message, Tag, MessageTag, Userprompt, EmployeeType, FieldMapping, RoleType, OrganizationType
 )
 # Import predefined values
 from value import role_type, employee_type, organization_type
@@ -94,6 +94,36 @@ def generate_organization_types(db):
             print(f"Error inserting organization type: {str(e)}")
     
     print(f"Successfully inserted {inserted_count} organization types")
+    return inserted_count
+
+def generate_field_mappings(db):
+    """Generate field mapping records from predefined values."""
+    print("Generating field mappings...")
+    
+    # Import predefined values for field and field_detail
+    from value import field, field_detail
+    
+    if len(field) != len(field_detail):
+        print("Error: field and field_detail arrays must have the same length")
+        return 0
+    
+    inserted_count = 0
+    for i in range(len(field)):
+        try:
+            field_mapping = FieldMapping(
+                field=field[i],
+                field_detail=field_detail[i]
+            )
+            db.add(field_mapping)
+            db.commit()
+            inserted_count += 1
+        except IntegrityError:
+            db.rollback()
+        except Exception as e:
+            db.rollback()
+            print(f"Error inserting field mapping: {str(e)}")
+    
+    print(f"Successfully inserted {inserted_count} field mappings")
     return inserted_count
 
 def generate_organizations(db, count=500):
@@ -247,19 +277,42 @@ def generate_conversations(db, count=500):
         print("No users found. Please generate users first.")
         return 0
     
+    # Japanese models if Japanese locale is selected
+    ja_models = [1, 2, 3, 4]  # Model IDs for Japanese models
+    en_models = [5, 6, 7, 8]  # Model IDs for English models
+    
     inserted_count = 0
     for i in range(count):
         try:
+            # Pick a random user
+            user = random.choice(users)
+            
+            # Determine if user is internal or external based on username pattern
+            # For example, let's assume internal users have usernames starting with "int_"
+            # You should replace this logic with your actual criteria for internal/external users
+            is_internal = user.external_id % 2 == 0  # Simple example: even IDs are internal users
+            
+            # Generate topic based on locale
+            if fake == fake_ja:
+                topic = "対話 " + str(i + 1) + ": " + fake.bs()
+                model_id = random.choice(ja_models)
+            else:
+                topic = "Conversation " + str(i + 1) + ": " + fake.bs()
+                model_id = random.choice(en_models)
+            
+            # Create conversation with display_flag based on user type
             conversation = Conversation(
                 external_id=2000 + i,
-                user_id=random.choice(users).external_id,
-                topic=fake.sentence(),
-                created_at=fake.date_time_between(start_date='-1y', end_date='now'),
-                model_id=random.randint(3, 5)  # Updated to use only model_id 3 to 5
+                user_id=user.external_id,
+                topic=topic,
+                created_at=fake.date_time_between(start_date='-3m', end_date='now'),
+                model_id=model_id,
+                display_flag=is_internal  # Set display_flag based on user type
             )
             db.add(conversation)
             db.commit()
             inserted_count += 1
+            
             if inserted_count % 50 == 0:
                 print(f"Inserted {inserted_count}/{count} conversations")
         except IntegrityError:
@@ -497,6 +550,7 @@ def generate_all_fake_data(locale='en'):
         generate_role_types(db)
         generate_employee_types(db)
         generate_organization_types(db)
+        generate_field_mappings(db)
         generate_organizations(db)
         generate_personnel(db)
         generate_users(db)
