@@ -138,6 +138,7 @@ class Personnel(Base):
         foreign_keys=[department_code],
         backref="personnels",
         lazy="joined",
+        uselist=True  # Explicitly state this is a one-to-many relationship
     )
 
 

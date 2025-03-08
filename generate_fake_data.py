@@ -5,6 +5,7 @@ from faker import Faker
 import sys
 import json
 import argparse
+from check_display import update_display_flag
 
 from connect import get_db, engine, Base
 from models import (
@@ -235,17 +236,19 @@ def generate_users(db, count=500):
     print(f"Generating {count} users...")
     
     # Get available personnel usernames
-    usernames = [p.external_username for p in db.query(Personnel).all()]
-    
-    if not usernames:
-        print("No personnel found. Please generate personnel first.")
-        return 0
+    personnel = db.query(Personnel).all()
+    personnel_usernames = [p.external_username for p in personnel]
     
     inserted_count = 0
     for i in range(count):
         try:
-            # Ensure username is never None since it's not nullable
-            username = random.choice(usernames)
+            # 50% chance of being an external user (no personnel data)
+            if random.random() < 0.5 and personnel_usernames:
+                # Internal user - use existing personnel username
+                username = random.choice(personnel_usernames)
+            else:
+                # External user - generate new unique username
+                username = fake.unique.user_name()
             
             user = User(
                 external_id=1000 + i,
@@ -288,8 +291,6 @@ def generate_conversations(db, count=500):
             user = random.choice(users)
             
             # Check if user has associated personnel data
-            # If user has personnel data, they are internal (display_flag = False)
-            # If user has no personnel data, they are external (display_flag = True)
             is_internal = user.personnel is not None
             
             # Generate topic based on locale
@@ -576,4 +577,5 @@ if __name__ == "__main__":
     
     print(f"Starting fake data generation in {args.locale} locale...")
     generate_all_fake_data(args.locale)
+    update_display_flag()
     print("Fake data generation completed.")
