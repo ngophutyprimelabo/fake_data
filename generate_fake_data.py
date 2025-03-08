@@ -187,7 +187,7 @@ def generate_organizations(db, count=500):
     print(f"Successfully inserted {inserted_count} organizations")
     return inserted_count
 
-def generate_personnel(db, count=500):
+def generate_personnel(db, count=400):
     """Generate personnel records."""
     print(f"Generating {count} personnel records...")
     
@@ -198,9 +198,13 @@ def generate_personnel(db, count=500):
         return 0
     
     inserted_count = 0
+    # We'll store usernames here to use in the generate_users function
+    personnel_usernames = []
+    
     for _ in range(count):
         try:
             username = fake.unique.user_name()
+            personnel_usernames.append(username)
             
             personnel = Personnel(
                 external_username=username,
@@ -211,11 +215,11 @@ def generate_personnel(db, count=500):
                 branch_name=fake.city(),
                 section_name=fake.company_prefix() if fake == fake_ja else fake.bs(),
                 sales_office_name=random.choice([fake.company_suffix(), None]),
-                organization_type=random.choice(organization_type + [None]),
-                employee_type=random.choice(employee_type + [None]),
-                role_type=random.choice(role_type + [None]),
-                is_organization_head=random.choice(["はい", "いいえ", None]) if fake == fake_ja else random.choice(["Yes", "No", None]),
-                is_department_head=random.choice(["はい", "いいえ", None]) if fake == fake_ja else random.choice(["Yes", "No", None])
+                organization_type=random.choice(organization_type),
+                employee_type=random.choice(employee_type),
+                role_type=random.choice(role_type),
+                is_organization_head=random.choice(["はい", "いいえ"]) if fake == fake_ja else random.choice(["Yes", "No"]),
+                is_department_head=random.choice(["はい", "いいえ"]) if fake == fake_ja else random.choice(["Yes", "No"])
             )
             db.add(personnel)
             db.commit()
@@ -235,37 +239,57 @@ def generate_users(db, count=500):
     """Generate user records."""
     print(f"Generating {count} users...")
     
-    # Get available personnel usernames
+    # Get available personnel usernames that don't have users yet
     personnel = db.query(Personnel).all()
     personnel_usernames = [p.external_username for p in personnel]
     
     inserted_count = 0
-    for i in range(count):
+    
+    # First, create users for all existing personnel (internal users)
+    for username in personnel_usernames:
         try:
-            # 50% chance of being an external user (no personnel data)
-            if random.random() < 0.5 and personnel_usernames:
-                # Internal user - use existing personnel username
-                username = random.choice(personnel_usernames)
-            else:
-                # External user - generate new unique username
-                username = fake.unique.user_name()
-            
             user = User(
-                external_id=1000 + i,
+                external_id=1000 + inserted_count,
                 external_id_delete_flag=random.choice([True, False]),
-                username=username,
+                username=username,  # Use the exact personnel username
                 created_at=fake.date_time_between(start_date='-2y', end_date='now')
             )
             db.add(user)
             db.commit()
             inserted_count += 1
             if inserted_count % 50 == 0:
-                print(f"Inserted {inserted_count}/{count} users")
+                print(f"Inserted {inserted_count} users")
         except IntegrityError:
             db.rollback()
         except Exception as e:
             db.rollback()
             print(f"Error inserting user: {str(e)}")
+    
+    # Then create additional users without personnel data (external users)
+    remaining = count - inserted_count
+    if remaining > 0:
+        print(f"Creating {remaining} additional external users...")
+        for i in range(remaining):
+            try:
+                # External user - generate new unique username
+                username = fake.unique.user_name()
+                
+                user = User(
+                    external_id=1000 + inserted_count + i,
+                    external_id_delete_flag=random.choice([True, False]),
+                    username=username,
+                    created_at=fake.date_time_between(start_date='-2y', end_date='now')
+                )
+                db.add(user)
+                db.commit()
+                inserted_count += 1
+                if inserted_count % 50 == 0:
+                    print(f"Inserted {inserted_count}/{count} users")
+            except IntegrityError:
+                db.rollback()
+            except Exception as e:
+                db.rollback()
+                print(f"Error inserting user: {str(e)}")
     
     print(f"Successfully inserted {inserted_count} users")
     return inserted_count
