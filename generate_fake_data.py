@@ -287,10 +287,10 @@ def generate_conversations(db, count=500):
             # Pick a random user
             user = random.choice(users)
             
-            # Determine if user is internal or external based on username pattern
-            # For example, let's assume internal users have usernames starting with "int_"
-            # You should replace this logic with your actual criteria for internal/external users
-            is_internal = user.external_id % 2 == 0  # Simple example: even IDs are internal users
+            # Check if user has associated personnel data
+            # If user has personnel data, they are internal (display_flag = False)
+            # If user has no personnel data, they are external (display_flag = True)
+            is_internal = user.personnel is not None
             
             # Generate topic based on locale
             if fake == fake_ja:
@@ -301,13 +301,15 @@ def generate_conversations(db, count=500):
                 model_id = random.choice(en_models)
             
             # Create conversation with display_flag based on user type
+            # If user is internal (has personnel), display_flag should be False
+            # If user is external (no personnel), display_flag should be True
             conversation = Conversation(
                 external_id=2000 + i,
                 user_id=user.external_id,
                 topic=topic,
                 created_at=fake.date_time_between(start_date='-3m', end_date='now'),
                 model_id=model_id,
-                display_flag=is_internal  # Set display_flag based on user type
+                display_flag=not is_internal  # Set display_flag to True for external users, False for internal users
             )
             db.add(conversation)
             db.commit()
