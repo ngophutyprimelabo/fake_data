@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Optional
 
-from connect import Base
+from core.database import Base
 from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, column_property, mapped_column, relationship
 from sqlalchemy.sql import func, select, text
@@ -98,16 +98,20 @@ class User(Base):
     )
     external_id_delete_flag: Mapped[bool] = mapped_column(Boolean, nullable=False)
     username: Mapped[Optional[str]] = mapped_column(
-        String(150), unique=True, nullable=False,
+        String(150),
+        unique=True,
+        nullable=False,
     )
+    internal_user_flag: Mapped[bool] = mapped_column(Boolean, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False
     )
     personnel = relationship(
         "Personnel",
-        primaryjoin="User.username==foreign(Personnel.external_username)",
+        primaryjoin="User.username==Personnel.external_username",
         backref="users",
-        lazy="joined"
+        lazy="joined",
+        foreign_keys="User.username",
     )
 
 
@@ -124,7 +128,7 @@ class Personnel(Base):
     )
     branch_code: Mapped[Optional[str]] = mapped_column(String(3))
     head_office_name: Mapped[Optional[str]] = mapped_column(String(255))
-    branch_name: Mapped[Optional[str]] = mapped_column(String(255))
+    branch_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=False)
     section_name: Mapped[Optional[str]] = mapped_column(String(255))
     sales_office_name: Mapped[Optional[str]] = mapped_column(String(255))
     organization_type: Mapped[Optional[str]] = mapped_column(String(255))
@@ -138,7 +142,15 @@ class Personnel(Base):
         foreign_keys=[department_code],
         backref="personnels",
         lazy="joined",
-        uselist=True  # Explicitly state this is a one-to-many relationship
+        uselist=False,
+    )
+    abbreviation_relation = relationship(
+        "Abbreviation",
+        primaryjoin="Personnel.branch_name==Abbreviation.abbreviation",
+        foreign_keys=[branch_name],
+        backref="personnels",
+        lazy="joined",
+        uselist=False,
     )
 
 
@@ -163,18 +175,6 @@ class Organization(Base):
     @property
     def field_mapping(self):
         return f"{self.field} {self.field_detail}"
-
-
-class Userprompt(Base):
-    __tablename__ = "userprompts"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    external_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    title: Mapped[str] = mapped_column(String(255), nullable=False)
-    prompt: Mapped[str] = mapped_column(Text, nullable=False)
-    user_id: Mapped[Optional[int]] = mapped_column(
-        Integer, ForeignKey("users.external_id"), nullable=True
-    )
 
 
 class OrganizationType(Base):
@@ -207,6 +207,12 @@ class RoleType(Base):
 
 class EmployeeType(Base):
     __tablename__ = "employee_types"
-
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     employee_type: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+
+
+class Abbreviation(Base):
+    __tablename__ = "abbreviations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    abbreviation: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
