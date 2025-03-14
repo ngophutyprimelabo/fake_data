@@ -107,8 +107,8 @@ class User(Base):
         DateTime, server_default=func.now(), nullable=False
     )
     personnel = relationship(
-        "Personnel", 
-        primaryjoin="and_(User.username==Personnel.external_username, or_(User.internal_user_flag==False, Personnel.id!=None))",
+        "Personnel",
+        primaryjoin="User.username==Personnel.external_username",
         backref="users",
         lazy="joined",
         foreign_keys="User.username",
@@ -140,14 +140,6 @@ class Personnel(Base):
     organization = relationship(
         "Organization",
         foreign_keys=[department_code],
-        backref="personnels",
-        lazy="joined",
-        uselist=False,
-    )
-    abbreviation_relation = relationship(
-        "Abbreviation",
-        primaryjoin="Personnel.branch_name==Abbreviation.abbreviation",
-        foreign_keys=[branch_name],
         backref="personnels",
         lazy="joined",
         uselist=False,
@@ -209,6 +201,21 @@ class EmployeeType(Base):
     __tablename__ = "employee_types"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     employee_type: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+
+
+# class SummariseWeekly(Base):
+#     __tablename__ = "summarise_weekly"
+
+#     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+#     update_date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+#     week_start_day: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+#     week_end_day: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+#     total_messages: Mapped[JSON] = mapped_column(JSON, nullable=False)
+#     active_users: Mapped[JSON] = mapped_column(JSON, nullable=False)
+#     role_type: Mapped[JSON] = mapped_column(JSON, nullable=False)
+#     employee_type: Mapped[JSON] = mapped_column(JSON, nullable=False)
+#     field_mapping: Mapped[JSON] = mapped_column(JSON, nullable=False)
+#     abbreviation: Mapped[JSON] = mapped_column(JSON, nullable=False)
 
 
 class Abbreviation(Base):

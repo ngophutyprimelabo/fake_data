@@ -109,12 +109,11 @@ def generate_data():
         users = []
         
         # Create internal users from personnel records
-        personnel_usernames = [p.external_username for p in personnel_list]
-        for username in personnel_usernames:
+        for personnel in personnel_list:
             user = User(
                 external_id=1000 + len(users),
                 external_id_delete_flag=random.choice([True, False]),
-                username=username,  # Use personnel's external_username
+                username=personnel.external_username,  # Using personnel's external_username
                 internal_user_flag=True,
                 created_at=fake.date_time_between(start_date='-2y', end_date='now')
             )
@@ -122,31 +121,31 @@ def generate_data():
             db.add(user)
         
         # Create external users (500 - number of internal users)
-        remaining = 500 - len(personnel_usernames)
-        for i in range(remaining):
-            user = User(
-                external_id=1000 + len(users) + i,
-                external_id_delete_flag=random.choice([True, False]),
-                username=fake.unique.user_name(),
-                internal_user_flag=False,  # External users
-                created_at=fake.date_time_between(start_date='-2y', end_date='now')
-            )
-            users.append(user)
-            db.add(user)
-        db.commit()
+        # remaining = 500 - len(personnel_list)
+        # for i in range(remaining):
+        #     user = User(
+        #         external_id=1000 + len(users),
+        #         external_id_delete_flag=random.choice([True, False]),
+        #         username=fake.unique.user_name(),
+        #         internal_user_flag=False,  # External users
+        #         created_at=fake.date_time_between(start_date='-2y', end_date='now')
+        #     )
+        #     users.append(user)
+        #     db.add(user)
+        # db.commit()
 
         # Generate Conversations (400 records)
         print("Generating conversations...")
         conversations = []
         for i in range(400):
-            user = random.choice(users)
+            user = random.choice(users)  # Randomly choosing a user
             conversation = Conversation(
                 external_id=2000 + i,
-                user_id=user.external_id,
+                user_id=user.external_id,  # Using the selected user's external_id
                 topic=f"対話 {i+1}: {fake.sentence()}",
                 created_at=fake.date_time_between(start_date='-3m', end_date='now'),
                 model_id=random.randint(1, 4),
-                display_flag=not user.internal_user_flag
+                display_flag=user.internal_user_flag
             )
             conversations.append(conversation)
             db.add(conversation)
