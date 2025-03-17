@@ -6,9 +6,9 @@ from connect import get_db, engine, Base
 from models import (
     User, Personnel, Organization, Conversation, 
     Message, Tag, MessageTag, RoleType, EmployeeType,
-    OrganizationType, FieldMapping, Abbreviation
+    FieldMapping, Abbreviation
 )
-from value import role_type, employee_type, field, field_detail, abbreviation
+from value import role_type, employee_type, abbreviation, FIELD_MAPPING
 
 # Initialize Faker
 fake = Faker('ja_JP')
@@ -40,19 +40,14 @@ def generate_data():
                 db.add(EmployeeType(employee_type=et))
         db.commit()
         
-        # Insert Organization Types
-        print("Generating organization types...")
+        # Define org_types for use later (without creating DB records)
         org_types = ["本社", "営業", "各支店", "その他"]
-        for ot in org_types:
-            if not db.query(OrganizationType).filter(OrganizationType.organization_type == ot).first():
-                db.add(OrganizationType(organization_type=ot))
-        db.commit()
-
+        
         # Insert Field Mappings
         print("Generating field mappings...")
-        for i in range(len(field)):
-            if not db.query(FieldMapping).filter(FieldMapping.field_detail == field_detail[i]).first():
-                db.add(FieldMapping(field=field[i], field_detail=field_detail[i]))
+        for field, field_detail in FIELD_MAPPING:
+            if not db.query(FieldMapping).filter(FieldMapping.field_detail == field_detail).first():
+                db.add(FieldMapping(field=field, field_detail=field_detail))
         db.commit()
 
         # Insert Abbreviations
@@ -66,13 +61,13 @@ def generate_data():
         print("Generating organizations...")
         organizations = []
         for _ in range(200):
-            idx = random.randint(0, len(field)-1)  # Get same index for field and field_detail
+            field_map = random.choice(FIELD_MAPPING)  # Random field mapping tuple
             org = Organization(
                 external_department_code=fake.unique.bothify(text="?####"),
                 external_division_code=fake.bothify(text="###"),
                 external_section_code=fake.bothify(text="##"),
-                field=field[idx],
-                field_detail=field_detail[idx],
+                field=field_map[0],
+                field_detail=field_map[1],
                 region=random.choice(["東京", "大阪", "名古屋", "福岡", "札幌", "仙台", "広島", "京都"]),
                 branch=fake.city(),
                 abbreviation=random.choice(abbreviation),
@@ -114,26 +109,12 @@ def generate_data():
             user = User(
                 external_id=1000 + len(users),
                 external_id_delete_flag=random.choice([True, False]),
-                username=personnel.external_username,  # Using personnel's external_username
+                username=personnel.external_username,
                 internal_user_flag=True,
                 created_at=fake.date_time_between(start_date='-2y', end_date='now')
             )
             users.append(user)
             db.add(user)
-        
-        # Create external users (500 - number of internal users)
-        # remaining = 500 - len(personnel_list)
-        # for i in range(remaining):
-        #     user = User(
-        #         external_id=1000 + len(users),
-        #         external_id_delete_flag=random.choice([True, False]),
-        #         username=fake.unique.user_name(),
-        #         internal_user_flag=False,  # External users
-        #         created_at=fake.date_time_between(start_date='-2y', end_date='now')
-        #     )
-        #     users.append(user)
-        #     db.add(user)
-        # db.commit()
 
         # Generate Conversations (400 records)
         print("Generating conversations...")
@@ -145,7 +126,7 @@ def generate_data():
                 user_id=user.external_id,  # Using the selected user's external_id
                 topic=f"対話 {i+1}: {fake.sentence()}",
                 created_at=fake.date_time_between(start_date='-3w', end_date=datetime.now() - timedelta(days=1)),
-                model_id=random.randint(1, 4),
+                model_id=random.choice([3, 4, 5]),
                 display_flag=user.internal_user_flag
             )
             conversations.append(conversation)
@@ -172,7 +153,6 @@ def generate_data():
                     conversation_id=conv.external_id,
                     message=fake.paragraph(),
                     is_bot=False,
-                    sender_id=conv.user_id,
                     chat_parameter=chat_params,
                     created_at=current_time
                 ))
@@ -184,7 +164,6 @@ def generate_data():
                     conversation_id=conv.external_id,
                     message=fake.paragraph(),
                     is_bot=True,
-                    sender_id=conv.user_id,
                     chat_parameter=chat_params,
                     created_at=current_time
                 ))
