@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Optional
 
-from connect import Base
+from core.database import Base
 from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, column_property, mapped_column, relationship
 from sqlalchemy.sql import func, select, text
@@ -19,9 +19,6 @@ class Message(Base):
     )
     message: Mapped[str] = mapped_column(Text, nullable=False)
     is_bot: Mapped[bool] = mapped_column(Boolean, nullable=False)
-    sender_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("users.external_id"), nullable=False
-    )
     chat_parameter: Mapped[dict] = mapped_column(JSON, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
@@ -169,15 +166,6 @@ class Organization(Base):
         return f"{self.field} {self.field_detail}"
 
 
-class OrganizationType(Base):
-    __tablename__ = "organization_types"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    organization_type: Mapped[str] = mapped_column(
-        String(255), unique=True, nullable=False
-    )
-
-
 class FieldMapping(Base):
     __tablename__ = "field_mappings"
 
@@ -203,19 +191,19 @@ class EmployeeType(Base):
     employee_type: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
 
 
-# class SummariseWeekly(Base):
-#     __tablename__ = "summarise_weekly"
+class SummariseWeekly(Base):
+    __tablename__ = "summarise_weekly"
 
-#     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-#     update_date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-#     week_start_day: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-#     week_end_day: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-#     total_messages: Mapped[JSON] = mapped_column(JSON, nullable=False)
-#     active_users: Mapped[JSON] = mapped_column(JSON, nullable=False)
-#     role_type: Mapped[JSON] = mapped_column(JSON, nullable=False)
-#     employee_type: Mapped[JSON] = mapped_column(JSON, nullable=False)
-#     field_mapping: Mapped[JSON] = mapped_column(JSON, nullable=False)
-#     abbreviation: Mapped[JSON] = mapped_column(JSON, nullable=False)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    update_date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    week_start_day: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    week_end_day: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    total_messages: Mapped[JSON] = mapped_column(JSON, nullable=False)
+    active_users: Mapped[JSON] = mapped_column(JSON, nullable=False)
+    role_type: Mapped[JSON] = mapped_column(JSON, nullable=False)
+    employee_type: Mapped[JSON] = mapped_column(JSON, nullable=False)
+    field_mapping: Mapped[JSON] = mapped_column(JSON, nullable=False)
+    abbreviation: Mapped[JSON] = mapped_column(JSON, nullable=False)
 
 
 class Abbreviation(Base):

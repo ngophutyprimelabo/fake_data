@@ -66,12 +66,13 @@ def generate_data():
         print("Generating organizations...")
         organizations = []
         for _ in range(200):
+            idx = random.randint(0, len(field)-1)  # Get same index for field and field_detail
             org = Organization(
                 external_department_code=fake.unique.bothify(text="?####"),
                 external_division_code=fake.bothify(text="###"),
                 external_section_code=fake.bothify(text="##"),
-                field=random.choice(field),
-                field_detail=random.choice(field_detail),
+                field=field[idx],
+                field_detail=field_detail[idx],
                 region=random.choice(["東京", "大阪", "名古屋", "福岡", "札幌", "仙台", "広島", "京都"]),
                 branch=fake.city(),
                 abbreviation=random.choice(abbreviation),
@@ -143,7 +144,7 @@ def generate_data():
                 external_id=2000 + i,
                 user_id=user.external_id,  # Using the selected user's external_id
                 topic=f"対話 {i+1}: {fake.sentence()}",
-                created_at=fake.date_time_between(start_date='-3m', end_date='now'),
+                created_at=fake.date_time_between(start_date='-3w', end_date=datetime.now() - timedelta(days=1)),
                 model_id=random.randint(1, 4),
                 display_flag=user.internal_user_flag
             )
