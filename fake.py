@@ -2,7 +2,7 @@ import random
 from datetime import datetime, timedelta
 from sqlalchemy.exc import IntegrityError
 from faker import Faker
-from connect import get_db, engine, Base
+from core.database import get_db, engine, Base
 from models import (
     User, Personnel, Organization, Conversation, 
     Message, Tag, MessageTag, RoleType, EmployeeType,

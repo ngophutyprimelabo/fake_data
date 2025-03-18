@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
-from connect import SessionLocal
+from core.database import SessionLocal
 from models import Conversation, User
 
 def update_display_flag():

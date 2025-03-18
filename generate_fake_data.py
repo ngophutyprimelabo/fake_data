@@ -7,7 +7,7 @@ import json
 import argparse
 from check_display import update_display_flag
 
-from connect import get_db, engine, Base
+from core.database import get_db, engine, Base
 from models import (
     User, Personnel, Organization, Conversation, 
     Message, Tag, MessageTag, Userprompt, EmployeeType, FieldMapping, RoleType, OrganizationType

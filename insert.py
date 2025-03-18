@@ -1,7 +1,7 @@
 import sys
 from sqlalchemy.exc import IntegrityError
 
-from connect import get_db, engine, Base
+from core.database import get_db, engine, Base
 from models import RoleType
 
 def create_tables():

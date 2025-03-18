@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Optional
 
-from connect import Base
+from core.database import Base
 from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, column_property, mapped_column, relationship
 from sqlalchemy.sql import func, select, text
@@ -20,6 +20,9 @@ class Message(Base):
     message: Mapped[str] = mapped_column(Text, nullable=False)
     is_bot: Mapped[bool] = mapped_column(Boolean, nullable=False)
     chat_parameter: Mapped[dict] = mapped_column(JSON, nullable=False)
+    main_category: Mapped[str] = mapped_column(String(255))
+    category_group: Mapped[str] = mapped_column(String(255))
+    chat_parameter_category: Mapped[str] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
 
@@ -61,16 +64,6 @@ class Conversation(Base):
     )
 
 
-class Tag(Base):
-    __tablename__ = "tags"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now(), nullable=False
-    )
-
-
 class MessageTag(Base):
     __tablename__ = "message_tags"
 
@@ -85,6 +78,19 @@ class MessageTag(Base):
         DateTime, server_default=func.now(), nullable=False
     )
 
+class CategoryMapping(Base):
+    __tablename__ = "category_mappings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    category_group: Mapped[int] = mapped_column(Integer, nullable=False)
+    category_group_label: Mapped[str] = mapped_column(String(255), nullable=False)
+    main_category: Mapped[str] = mapped_column(String(5), nullable=False)
+    main_category_label: Mapped[str] = mapped_column(String(255), nullable=False)
+    chat_parameter_category: Mapped[str] = mapped_column(String(5), nullable=False)
+    chat_parameter_category_label: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
+    )
 
 class User(Base):
     __tablename__ = "users"
