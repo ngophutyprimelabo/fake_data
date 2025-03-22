@@ -1,52 +1,71 @@
-from sqlalchemy import create_engine, inspect
-from typing import Dict, List, Optional
-from urllib.parse import quote_plus
-from core.database_prod import DATABASE_URL
+from typing import List, Any, Type, TypeVar
+from sqlalchemy.orm import Session
+from core.database import get_db as get_db_local
+from core.database_prod import get_db
+from sqlalchemy.ext.declarative import DeclarativeMeta
+from model_prod import *
+from models import *
 
+Base = TypeVar('Base', bound=DeclarativeMeta)
+taget_db = next(get_db_local())
 
-class SchemaReader:
-    def __init__(self, db_config: Dict[str, str]):
-        self.db_config = db_config
-        self.engine = self._create_engine()
-
-    def _create_engine(self):
-        db_url = (
-            f"mysql+pymysql://{self.db_config['user']}:{quote_plus(self.db_config['password'])}"
-            f"@{self.db_config['host']}:{self.db_config['port']}/{self.db_config['database']}"
-        )
-        return create_engine(
-            db_url,
-            connect_args={"charset": "utf8mb4", "connect_timeout": 60}
-        )
-
-    def get_table_data(self, table_name: str, batch_size: int = 1000):
-        import pandas as pd
-        
-        count_query = f"SELECT COUNT(*) as count FROM {table_name}"
-        total_count = pd.read_sql(count_query, self.engine).iloc[0]['count']
-        
-        for offset in range(0, total_count, batch_size):
-            query = f"SELECT * FROM {table_name} LIMIT {batch_size} OFFSET {offset}"
-            df = pd.read_sql(query, self.engine)
-            yield df.to_dict('records')
-
-def main():
-    db_config = {
-        'user': 'root',
-        'password': 'root',
-        'host': 'localhost',
-        'port': '3306',
-        'database': 'fake'
-    }
+def batch_get_data(
+    db_model: Type[Base],
+    db: Session,
+    skip: int = 0,
+    limit: int = 100,
+    filters: dict = None
+) -> List[Any]:
+    query = db.query(db_model)
     
-    reader = SchemaReader(db_config)
+    if filters:
+        for key, value in filters.items():
+            if hasattr(db_model, key):
+                query = query.filter(getattr(db_model, key) == value)
     
-    table_name = "app_chatmessage"
-    for batch in reader.get_table_data(table_name):
-        print(f"Batch of {len(batch)} records:")
-        for row in batch:
-            print(row)
-        break 
+    return query.offset(skip).limit(limit).all()
 
-if __name__ == "__main__":
-    main()
+def get_all_data(
+    db_model: Type[Base],
+    db: Session,
+    filters: dict = None
+) -> List[Any]:
+    query = db.query(db_model)
+    
+    if filters:
+        for key, value in filters.items():
+            if hasattr(db_model, key):
+                query = query.filter(getattr(db_model, key) == value)
+    
+    return query.all()
+
+def get_table_data(model: Type[Base], skip: int = 0, limit: int = 100, filters: dict = None) -> List[Any]:
+    db = next(get_db())
+    try:
+        return batch_get_data(model, db, skip, limit, filters)
+    finally:
+        db.close()
+
+def get_all_table_data(model: Type[Base], filters: dict = None) -> List[Any]:
+    db = next(get_db())
+    try:
+        return get_all_data(model, db, filters)
+    finally:
+        db.close()
+
+# data = get_table_data(ChatMessage, filters={"is_eval": True})
+chat_message = get_all_table_data(ChatMessage)
+i=0
+for chat in chat_message:
+    i+=1
+    d = User(
+            external_id=chat.id,
+            external_id_delete_flag=0,
+            username="hello" +f'{i}',
+            internal_user_flag=True,
+            created_at=datetime.now(),
+    )
+
+    taget_db.add(d)
+    taget_db.commit()
+taget_db.close()

@@ -3,7 +3,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 
 DATABASE_URL = (
-    f"mysql+pymysql://root:root@localhost:3306/fake"
+    f"mysql+pymysql://dev:dev@localhost:3306/fake"
 )
 
 engine = create_engine(

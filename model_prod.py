@@ -7,25 +7,6 @@ from sqlalchemy.orm import Mapped, column_property, mapped_column, relationship
 from sqlalchemy.sql import func, select, text
 
 
-class Message(Base):
-    __tablename__ = "messages"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    external_id: Mapped[int] = mapped_column(
-        Integer, unique=True, index=True, nullable=False
-    )
-    conversation_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("conversations.external_id"), nullable=False
-    )
-    message: Mapped[str] = mapped_column(Text, nullable=False)
-    is_bot: Mapped[bool] = mapped_column(Boolean, nullable=False)
-    chat_parameter: Mapped[dict] = mapped_column(JSON, nullable=False)
-    main_category: Mapped[str] = mapped_column(String(255))
-    category_group: Mapped[str] = mapped_column(String(255))
-    chat_parameter_category: Mapped[str] = mapped_column(String(255))
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-
-
 class CategoryGroup(Base):
     __tablename__ = "app_categorygroup"
 
@@ -50,7 +31,7 @@ class ChatConversation(Base):
     thread_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     vector_store_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
-    user = relationship("User", foreign_keys=[user_id])
+    user = relationship("AuthUser", foreign_keys=[user_id])
     model = relationship("ChatModel", foreign_keys=[model_id])
 
 
@@ -119,7 +100,7 @@ class ChatParameterGroup(Base):
     model = relationship("ChatModel", foreign_keys=[model_id])
 
 
-class User(Base):
+class AuthUser(Base):
     __tablename__ = "auth_user"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
