@@ -1,6 +1,7 @@
 from sqlalchemy import create_engine, inspect
 from typing import Dict, List, Optional
 from urllib.parse import quote_plus
+from core.database_prod import DATABASE_URL
 
 
 class SchemaReader:
@@ -17,61 +18,6 @@ class SchemaReader:
             db_url,
             connect_args={"charset": "utf8mb4", "connect_timeout": 60}
         )
-
-    def get_table_schema(self, table_name: Optional[str] = None) -> Dict[str, List[Dict]]:
-        inspector = inspect(self.engine)
-        schema_info = {}
-
-        if table_name:
-            tables = [table_name]
-        else:
-            tables = inspector.get_table_names()
-
-        for tbl in tables:
-            columns = []
-            for column in inspector.get_columns(tbl):
-                column_info = {
-                    'name': column['name'],
-                    'type': str(column['type']),
-                    'nullable': column.get('nullable', True),
-                    'default': column.get('default', None),
-                    'primary_key': column.get('primary_key', False)
-                }
-                columns.append(column_info)
-            
-            foreign_keys = []
-            for fk in inspector.get_foreign_keys(tbl):
-                foreign_keys.append({
-                    'constrained_columns': fk['constrained_columns'],
-                    'referred_table': fk['referred_table'],
-                    'referred_columns': fk['referred_columns']
-                })
-            
-            schema_info[tbl] = {
-                'columns': columns,
-                'foreign_keys': foreign_keys
-            }
-
-        return schema_info
-
-    def print_schema(self, table_name: Optional[str] = None):
-        """Print formatted schema information"""
-        schema = self.get_table_schema(table_name)
-        
-        for table_name, info in schema.items():
-            print(f"\n=== Table: {table_name} ===")
-            print("\nColumns:")
-            for col in info['columns']:
-                nullable = "NULL" if col['nullable'] else "NOT NULL"
-                pk = "PRIMARY KEY" if col['primary_key'] else ""
-                default = f"DEFAULT {col['default']}" if col['default'] else ""
-                print(f"- {col['name']}: {col['type']} {nullable} {default} {pk}")
-            
-            if info['foreign_keys']:
-                print("\nForeign Keys:")
-                for fk in info['foreign_keys']:
-                    print(f"- {', '.join(fk['constrained_columns'])} -> "
-                          f"{fk['referred_table']}({', '.join(fk['referred_columns'])})")
 
     def get_table_data(self, table_name: str, batch_size: int = 1000):
         import pandas as pd
@@ -95,7 +41,7 @@ def main():
     
     reader = SchemaReader(db_config)
     
-    table_name = "app_categorygroup"
+    table_name = "app_chatmessage"
     for batch in reader.get_table_data(table_name):
         print(f"Batch of {len(batch)} records:")
         for row in batch:
