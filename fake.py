@@ -1,14 +1,13 @@
 import random
 from datetime import datetime, timedelta
-from sqlalchemy.exc import IntegrityError
 from faker import Faker
 from core.database import get_db, engine, Base
 from models import (
-    User, Personnel, Organization, Conversation, 
-    Message, Tag, MessageTag, RoleType, EmployeeType,
-    FieldMapping, Abbreviation
+    User, Personnel, Organization, Conversation,
+    Message, RoleType, EmployeeType,
+    FieldMapping, Abbreviation, CategoryMapping
 )
-from value import role_type, employee_type, abbreviation, FIELD_MAPPING
+from value import role_type, employee_type, abbreviation, FIELD_MAPPING, insurance_categories
 
 # Initialize Faker
 fake = Faker('ja_JP')
@@ -43,6 +42,19 @@ def generate_data():
         # Define org_types for use later (without creating DB records)
         org_types = ["本社", "営業", "各支店", "その他"]
         
+        # Insert Insurance Categories
+        print("Generating category mappings...")
+        for category_group, main_category, chat_parameter_category in insurance_categories:
+            db.add(CategoryMapping(
+                category_group=1,
+                category_group_label=f"{category_group}",
+                main_category=main_category,
+                main_category_label=f"{main_category}",
+                chat_parameter_category=chat_parameter_category,
+                chat_parameter_category_label=f"{chat_parameter_category}"
+            ))
+        db.commit()
+
         # Insert Field Mappings
         print("Generating field mappings...")
         for field, field_detail in FIELD_MAPPING:
@@ -80,14 +92,41 @@ def generate_data():
         # Generate Personnel (300 records)
         print("Generating personnel...")
         personnel_list = []
-        for _ in range(300):
+        total_personnel = 300
+        
+        # First, ensure all abbreviations are used at least once
+        remaining_abbrs = abbreviation.copy()
+        initial_records = len(remaining_abbrs)
+        
+        # Create one record for each abbreviation
+        for abbr in remaining_abbrs[:initial_records]:
             personnel = Personnel(
                 external_username=fake.unique.user_name(),
                 entry_year=random.randint(1980, 2025),
                 department_code=random.choice([org.external_department_code for org in organizations]),
                 branch_code=fake.bothify(text="###"),
                 head_office_name=fake.company(),
-                branch_name=random.choice(abbreviation),
+                branch_name=abbr,  # Use each abbreviation exactly once
+                section_name=fake.company_suffix(),
+                sales_office_name=fake.company_suffix(),
+                organization_type=random.choice(org_types),
+                employee_type=random.choice(employee_type),
+                role_type=random.choice(role_type),
+                is_organization_head=random.choice(["はい", "いいえ"]),
+                is_department_head=random.choice(["はい", "いいえ"])
+            )
+            personnel_list.append(personnel)
+            db.add(personnel)
+        
+        # Generate remaining records with random abbreviations
+        for _ in range(total_personnel - initial_records):
+            personnel = Personnel(
+                external_username=fake.unique.user_name(),
+                entry_year=random.randint(1980, 2025),
+                department_code=random.choice([org.external_department_code for org in organizations]),
+                branch_code=fake.bothify(text="###"),
+                head_office_name=fake.company(),
+                branch_name=random.choice(abbreviation),  # Randomly choose from all abbreviations
                 section_name=fake.company_suffix(),
                 sales_office_name=fake.company_suffix(),
                 organization_type=random.choice(org_types),
@@ -140,6 +179,10 @@ def generate_data():
             pairs = random.randint(3, 7)
             current_time = conv.created_at
             
+            # Randomly select a category for this conversation
+            category_choice = random.choice(insurance_categories)
+            category_group, main_category, chat_parameter_category = category_choice
+            
             for _ in range(pairs):
                 # User message
                 chat_params = {
@@ -154,6 +197,10 @@ def generate_data():
                     message=fake.paragraph(),
                     is_bot=False,
                     chat_parameter=chat_params,
+                    # Add these required fields:
+                    main_category=main_category,
+                    category_group=category_group,
+                    chat_parameter_category=chat_parameter_category,
                     created_at=current_time
                 ))
                 
@@ -165,39 +212,15 @@ def generate_data():
                     message=fake.paragraph(),
                     is_bot=True,
                     chat_parameter=chat_params,
+                    # Add these required fields:
+                    main_category=main_category,
+                    category_group=category_group,
+                    chat_parameter_category=chat_parameter_category,
                     created_at=current_time
                 ))
                 
                 # Add delay before next pair
                 current_time += timedelta(minutes=random.randint(1, 10))
-        db.commit()
-
-        # Generate Tags (100 records)
-        print("Generating tags...")
-        tags = []
-        common_tags = [
-            "技術", "ビジネス", "科学", "健康", "教育", "政治", "経済", "スポーツ",
-            "エンターテイメント", "食品", "旅行", "ファッション", "テクノロジー", "自動車",
-            "金融", "芸術", "音楽", "映画", "書籍", "ゲーム"
-        ]
-        for tag_name in common_tags:
-            tag = Tag(
-                name=tag_name,
-                created_at=fake.date_time_between(start_date='-1y', end_date='now')
-            )
-            tags.append(tag)
-            db.add(tag)
-        db.commit()
-
-        # Generate Message Tags (1000 records)
-        print("Generating message tags...")
-        messages = db.query(Message).all()
-        for _ in range(1000):
-            db.add(MessageTag(
-                message_id=random.choice(messages).external_id,
-                tag_id=random.choice(tags).id,
-                created_at=fake.date_time_between(start_date='-1y', end_date='now')
-            ))
         db.commit()
 
         print("Data generation completed successfully!")

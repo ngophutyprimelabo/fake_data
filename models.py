@@ -63,30 +63,15 @@ class Conversation(Base):
         .scalar_subquery()
     )
 
-
-class MessageTag(Base):
-    __tablename__ = "message_tags"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    message_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("messages.external_id", ondelete="CASCADE"), nullable=False
-    )
-    tag_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("tags.id", ondelete="CASCADE"), nullable=False
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now(), nullable=False
-    )
-
 class CategoryMapping(Base):
     __tablename__ = "category_mappings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    category_group: Mapped[int] = mapped_column(Integer, nullable=False)
+    category_group: Mapped[str] = mapped_column(String(255), nullable=False)
     category_group_label: Mapped[str] = mapped_column(String(255), nullable=False)
-    main_category: Mapped[str] = mapped_column(String(5), nullable=False)
+    main_category: Mapped[str] = mapped_column(String(255), nullable=False)
     main_category_label: Mapped[str] = mapped_column(String(255), nullable=False)
-    chat_parameter_category: Mapped[str] = mapped_column(String(5), nullable=False)
+    chat_parameter_category: Mapped[str] = mapped_column(String(255), nullable=False)
     chat_parameter_category_label: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False
