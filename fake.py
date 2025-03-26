@@ -7,7 +7,7 @@ from models import (
     Message, RoleType, EmployeeType,
     FieldMapping, Abbreviation, CategoryMapping
 )
-from value import role_type, employee_type, abbreviation, FIELD_MAPPING, insurance_categories
+from value import role_type, employee_type, abbreviation, FIELD_MAPPING, insurance_categories, EXCLUDE_ROLE_TYPE
 
 # Initialize Faker
 fake = Faker('ja_JP')
@@ -44,14 +44,14 @@ def generate_data():
         
         # Insert Insurance Categories
         print("Generating category mappings...")
-        for category_group, main_category, chat_parameter_category in insurance_categories:
+        for category_group, category_group_label, main_category, main_category_label, chat_parameter_category, chat_parameter_category_label in insurance_categories:
             db.add(CategoryMapping(
-                category_group=1,
-                category_group_label=f"{category_group}",
+                category_group=category_group,
+                category_group_label=category_group_label,
                 main_category=main_category,
-                main_category_label=f"{main_category}",
+                main_category_label=main_category_label,
                 chat_parameter_category=chat_parameter_category,
-                chat_parameter_category_label=f"{chat_parameter_category}"
+                chat_parameter_category_label=chat_parameter_category_label
             ))
         db.commit()
 
@@ -145,28 +145,53 @@ def generate_data():
         
         # Create internal users from personnel records
         for personnel in personnel_list:
+            # Determine if this is a valid internal user based on your criteria
+            is_internal = True
+            
+            # Check organization_type is not None and role_type is not in EXCLUDE_ROLE_TYPE
+            if personnel.organization_type is None or personnel.role_type in EXCLUDE_ROLE_TYPE:
+                is_internal = False
+                
             user = User(
                 external_id=1000 + len(users),
                 external_id_delete_flag=random.choice([True, False]),
                 username=personnel.external_username,
-                internal_user_flag=True,
+                internal_user_flag=is_internal,  # Set based on our criteria
                 created_at=fake.date_time_between(start_date='-2y', end_date='now')
             )
             users.append(user)
             db.add(user)
+        
+        # Add some external users (not in personnel system)
+        for i in range(200):
+            user = User(
+                external_id=1000 + len(users),
+                external_id_delete_flag=random.choice([True, False]),
+                username=fake.unique.user_name(),
+                internal_user_flag=False,  # External users
+                created_at=fake.date_time_between(start_date='-2y', end_date='now')
+            )
+            users.append(user)
+            db.add(user)
+        
+        db.commit()
 
         # Generate Conversations (400 records)
         print("Generating conversations...")
         conversations = []
         for i in range(400):
             user = random.choice(users)  # Randomly choosing a user
+            
+            # Set display_flag based on internal_user_flag
+            display_flag = user.internal_user_flag
+            
             conversation = Conversation(
                 external_id=2000 + i,
                 user_id=user.external_id,  # Using the selected user's external_id
                 topic=f"対話 {i+1}: {fake.sentence()}",
                 created_at=fake.date_time_between(start_date='-3w', end_date=datetime.now() - timedelta(days=1)),
                 model_id=random.choice([3, 4, 5]),
-                display_flag=user.internal_user_flag
+                display_flag=display_flag  # Set based on user's internal flag
             )
             conversations.append(conversation)
             db.add(conversation)
@@ -181,7 +206,7 @@ def generate_data():
             
             # Randomly select a category for this conversation
             category_choice = random.choice(insurance_categories)
-            category_group, main_category, chat_parameter_category = category_choice
+            _, category_group_label,_, main_category_label,_, chat_parameter_category_label = category_choice
             
             for _ in range(pairs):
                 # User message
@@ -198,14 +223,14 @@ def generate_data():
                     is_bot=False,
                     chat_parameter=chat_params,
                     # Add these required fields:
-                    main_category=main_category,
-                    category_group=category_group,
-                    chat_parameter_category=chat_parameter_category,
+                    main_category=main_category_label,
+                    category_group=category_group_label,
+                    chat_parameter_category=chat_parameter_category_label,
                     created_at=current_time
                 ))
                 
                 # Bot response (5-30 seconds later)
-                current_time += timedelta(seconds=random.randint(5, 30))
+                current_time += timedelta(seconds=random.randint(30, 50))
                 db.add(Message(
                     external_id=fake.unique.random_number(digits=8),
                     conversation_id=conv.external_id,
@@ -213,9 +238,9 @@ def generate_data():
                     is_bot=True,
                     chat_parameter=chat_params,
                     # Add these required fields:
-                    main_category=main_category,
-                    category_group=category_group,
-                    chat_parameter_category=chat_parameter_category,
+                    main_category=main_category_label,
+                    category_group=category_group_label,
+                    chat_parameter_category=chat_parameter_category_label,
                     created_at=current_time
                 ))
                 
@@ -231,5 +256,56 @@ def generate_data():
     finally:
         db.close()
 
+# Function to check and update display flags if needed
+def update_display_flags():
+    db = next(get_db())
+    try:
+        print("Updating display flags for conversations...")
+        
+        # Get all users
+        users = db.query(User).all()
+        updated_count = 0
+        
+        for user in users:
+            should_display = True
+            
+            # Check if user has a personnel record
+            personnel = db.query(Personnel).filter(Personnel.external_username == user.username).first()
+            if not personnel:
+                should_display = False
+            else:
+                # Check if organization_type is null
+                if personnel.organization_type is None:
+                    should_display = False
+                # Check if role_type is in EXCLUDE_ROLE_TYPE
+                elif personnel.role_type in EXCLUDE_ROLE_TYPE:
+                    should_display = False
+            
+            # Update all conversations for this user if needed
+            if not should_display and user.internal_user_flag:
+                # Update user first
+                user.internal_user_flag = False
+                
+                # Get all conversations for this user
+                conversations = db.query(Conversation).filter(
+                    Conversation.user_id == user.external_id,
+                    Conversation.display_flag == True  # Only update those currently set to True
+                ).all()
+                
+                for conversation in conversations:
+                    conversation.display_flag = False
+                    updated_count += 1
+        
+        db.commit()
+        print(f"Updated display_flag to False for {updated_count} conversations")
+        
+    except Exception as e:
+        db.rollback()
+        print(f"Error updating display flags: {str(e)}")
+    finally:
+        db.close()
+
 if __name__ == "__main__":
     generate_data()
+    # Run validation to ensure all flags are properly set
+    update_display_flags()

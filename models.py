@@ -182,21 +182,6 @@ class EmployeeType(Base):
     employee_type: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
 
 
-class SummariseWeekly(Base):
-    __tablename__ = "summarise_weekly"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    update_date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    week_start_day: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    week_end_day: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    total_messages: Mapped[JSON] = mapped_column(JSON, nullable=False)
-    active_users: Mapped[JSON] = mapped_column(JSON, nullable=False)
-    role_type: Mapped[JSON] = mapped_column(JSON, nullable=False)
-    employee_type: Mapped[JSON] = mapped_column(JSON, nullable=False)
-    field_mapping: Mapped[JSON] = mapped_column(JSON, nullable=False)
-    abbreviation: Mapped[JSON] = mapped_column(JSON, nullable=False)
-
-
 class Abbreviation(Base):
     __tablename__ = "abbreviations"
 
