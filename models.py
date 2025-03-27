@@ -15,15 +15,15 @@ class Message(Base):
         Integer, unique=True, index=True, nullable=False
     )
     conversation_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("conversations.external_id"), nullable=False
+        Integer, ForeignKey("conversations.external_id"), nullable=False, index=True
     )
     message: Mapped[str] = mapped_column(Text, nullable=False)
-    is_bot: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    is_bot: Mapped[bool] = mapped_column(Boolean, nullable=False, index=True)
     chat_parameter: Mapped[dict] = mapped_column(JSON, nullable=False)
-    main_category: Mapped[str] = mapped_column(String(255))
-    category_group: Mapped[str] = mapped_column(String(255))
-    chat_parameter_category: Mapped[str] = mapped_column(String(255))
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    main_category: Mapped[str] = mapped_column(String(255), nullable=True)
+    category_group: Mapped[str] = mapped_column(String(255), nullable=True)
+    chat_parameter_category: Mapped[str] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False ,index=True)
 
 
 class Conversation(Base):
@@ -34,12 +34,12 @@ class Conversation(Base):
         Integer, unique=True, index=True, nullable=False
     )
     user_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("users.external_id"), nullable=False
+        Integer, ForeignKey("users.external_id"), nullable=False, index=True
     )
     topic: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     model_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    display_flag: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    display_flag: Mapped[bool] = mapped_column(Boolean, nullable=True)
 
     user = relationship(
         "User",
@@ -63,19 +63,23 @@ class Conversation(Base):
         .scalar_subquery()
     )
 
+
 class CategoryMapping(Base):
     __tablename__ = "category_mappings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    category_group: Mapped[str] = mapped_column(String(255), nullable=False)
+    category_group: Mapped[int] = mapped_column(Integer, nullable=False)
     category_group_label: Mapped[str] = mapped_column(String(255), nullable=False)
-    main_category: Mapped[str] = mapped_column(String(255), nullable=False)
+    main_category: Mapped[str] = mapped_column(String(5), nullable=False)
     main_category_label: Mapped[str] = mapped_column(String(255), nullable=False)
-    chat_parameter_category: Mapped[str] = mapped_column(String(255), nullable=False)
-    chat_parameter_category_label: Mapped[str] = mapped_column(String(255), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now(), nullable=False
+    chat_parameter_category: Mapped[str] = mapped_column(String(5), nullable=False)
+    chat_parameter_category_label: Mapped[str] = mapped_column(
+        String(255), nullable=False
     )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False,
+    )
+
 
 class User(Base):
     __tablename__ = "users"
@@ -89,8 +93,9 @@ class User(Base):
         String(150),
         unique=True,
         nullable=False,
+        index=True,
     )
-    internal_user_flag: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    internal_user_flag: Mapped[bool] = mapped_column(Boolean, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False
     )
@@ -112,7 +117,7 @@ class Personnel(Base):
     )
     entry_year: Mapped[Optional[int]] = mapped_column(Integer)
     department_code: Mapped[str] = mapped_column(
-        String(5), ForeignKey("organizations.external_department_code"), nullable=False
+        String(5), ForeignKey("organizations.external_department_code"), nullable=False, index=True
     )
     branch_code: Mapped[Optional[str]] = mapped_column(String(3))
     head_office_name: Mapped[Optional[str]] = mapped_column(String(255))
@@ -120,8 +125,8 @@ class Personnel(Base):
     section_name: Mapped[Optional[str]] = mapped_column(String(255))
     sales_office_name: Mapped[Optional[str]] = mapped_column(String(255))
     organization_type: Mapped[Optional[str]] = mapped_column(String(255))
-    employee_type: Mapped[Optional[str]] = mapped_column(String(255))
-    role_type: Mapped[Optional[str]] = mapped_column(String(255))
+    employee_type: Mapped[Optional[str]] = mapped_column(String(255), index=True)
+    role_type: Mapped[Optional[str]] = mapped_column(String(255), index=True)
     is_organization_head: Mapped[Optional[str]] = mapped_column(String(255))
     is_department_head: Mapped[Optional[str]] = mapped_column(String(255))
 
@@ -143,11 +148,11 @@ class Organization(Base):
     )
     external_division_code: Mapped[str] = mapped_column(String(3), nullable=False)
     external_section_code: Mapped[str] = mapped_column(String(2), nullable=False)
-    field: Mapped[Optional[str]] = mapped_column(String(255))
-    field_detail: Mapped[Optional[str]] = mapped_column(String(255))
+    field: Mapped[Optional[str]] = mapped_column(String(255) , index=True)  
+    field_detail: Mapped[Optional[str]] = mapped_column(String(255), index=True)
     region: Mapped[Optional[str]] = mapped_column(String(255))
     branch: Mapped[Optional[str]] = mapped_column(String(255))
-    abbreviation: Mapped[Optional[str]] = mapped_column(String(255))
+    abbreviation: Mapped[Optional[str]] = mapped_column(String(255), index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False
     )
@@ -161,8 +166,8 @@ class FieldMapping(Base):
     __tablename__ = "field_mappings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    field: Mapped[str] = mapped_column(String(255), nullable=False)
-    field_detail: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    field: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    field_detail: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
 
     @property
     def field_mapping(self):
@@ -174,12 +179,19 @@ class RoleType(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     role_type: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    roletype_display_flag: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True
+    )
 
 
 class EmployeeType(Base):
     __tablename__ = "employee_types"
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     employee_type: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    employeetype_display_flag: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True
+    )
 
 
 class Abbreviation(Base):
