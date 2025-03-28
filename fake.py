@@ -8,9 +8,12 @@ from models import (
     FieldMapping, Abbreviation, CategoryMapping
 )
 from value import role_type, employee_type, abbreviation, FIELD_MAPPING, insurance_categories, EXCLUDE_ROLE_TYPE
+import itertools
 
 # Initialize Faker
 fake = Faker('ja_JP')
+# Add more locales if needed for more diverse fake data
+fake_others = [Faker('en_US'), Faker('zh_CN'), Faker('ko_KR')]
 
 def create_tables():
     """Create all tables in database"""
@@ -69,10 +72,10 @@ def generate_data():
                 db.add(Abbreviation(abbreviation=abbr))
         db.commit()
 
-        # Generate Organizations (200 records)
+        # Generate Organizations (500 records)
         print("Generating organizations...")
         organizations = []
-        for _ in range(200):
+        for _ in range(500):
             field_map = random.choice(FIELD_MAPPING)  # Random field mapping tuple
             org = Organization(
                 external_department_code=fake.unique.bothify(text="?####"),
@@ -88,11 +91,12 @@ def generate_data():
             organizations.append(org)
             db.add(org)
         db.commit()
+        print(f"Created {len(organizations)} organizations")
 
-        # Generate Personnel (300 records)
+        # Generate Personnel (5000 records)
         print("Generating personnel...")
         personnel_list = []
-        total_personnel = 300
+        total_personnel = 5000
         
         # First, ensure all abbreviations are used at least once
         remaining_abbrs = abbreviation.copy()
@@ -119,134 +123,268 @@ def generate_data():
             db.add(personnel)
         
         # Generate remaining records with random abbreviations
-        for _ in range(total_personnel - initial_records):
-            personnel = Personnel(
-                external_username=fake.unique.user_name(),
-                entry_year=random.randint(1980, 2025),
-                department_code=random.choice([org.external_department_code for org in organizations]),
-                branch_code=fake.bothify(text="###"),
-                head_office_name=fake.company(),
-                branch_name=random.choice(abbreviation),  # Randomly choose from all abbreviations
-                section_name=fake.company_suffix(),
-                sales_office_name=fake.company_suffix(),
-                organization_type=random.choice(org_types),
-                employee_type=random.choice(employee_type),
-                role_type=random.choice(role_type),
-                is_organization_head=random.choice(["はい", "いいえ"]),
-                is_department_head=random.choice(["はい", "いいえ"])
-            )
-            personnel_list.append(personnel)
-            db.add(personnel)
-        db.commit()
+        batch_size = 500
+        remaining_count = total_personnel - initial_records
+        
+        for batch_start in range(0, remaining_count, batch_size):
+            batch_end = min(batch_start + batch_size, remaining_count)
+            print(f"Generating personnel batch {batch_start}-{batch_end} of {remaining_count}...")
+            
+            for _ in range(batch_end - batch_start):
+                personnel = Personnel(
+                    external_username=fake.unique.user_name(),
+                    entry_year=random.randint(1980, 2025),
+                    department_code=random.choice([org.external_department_code for org in organizations]),
+                    branch_code=fake.bothify(text="###"),
+                    head_office_name=fake.company(),
+                    branch_name=random.choice(abbreviation),  # Randomly choose from all abbreviations
+                    section_name=fake.company_suffix(),
+                    sales_office_name=fake.company_suffix(),
+                    organization_type=random.choice(org_types),
+                    employee_type=random.choice(employee_type),
+                    role_type=random.choice(role_type),
+                    is_organization_head=random.choice(["はい", "いいえ"]),
+                    is_department_head=random.choice(["はい", "いいえ"])
+                )
+                personnel_list.append(personnel)
+                db.add(personnel)
+            db.commit()
+        
+        print(f"Created {len(personnel_list)} personnel records")
 
-        # Generate Users (500 records)
+        # Generate Users (15000 records)
         print("Generating users...")
         users = []
+        user_batch_size = 1000
+        internal_user_count = len(personnel_list)
+        external_user_count = 15000 - internal_user_count
         
-        # Create internal users from personnel records
-        for personnel in personnel_list:
-            # Determine if this is a valid internal user based on your criteria
-            is_internal = True
+        # Track used usernames to ensure uniqueness
+        used_usernames = set()
+        
+        # Create internal users from personnel records (in batches)
+        for batch_start in range(0, internal_user_count, user_batch_size):
+            batch_end = min(batch_start + user_batch_size, internal_user_count)
+            print(f"Generating internal users batch {batch_start}-{batch_end} of {internal_user_count}...")
             
-            # Check organization_type is not None and role_type is not in EXCLUDE_ROLE_TYPE
-            if personnel.organization_type is None or personnel.role_type in EXCLUDE_ROLE_TYPE:
-                is_internal = False
+            batch_personnel = personnel_list[batch_start:batch_end]
+            for personnel in batch_personnel:
+                # Determine if this is a valid internal user based on your criteria
+                is_internal = True
                 
-            user = User(
-                external_id=1000 + len(users),
-                external_id_delete_flag=random.choice([True, False]),
-                username=personnel.external_username,
-                internal_user_flag=is_internal,  # Set based on our criteria
-                created_at=fake.date_time_between(start_date='-2y', end_date='now')
-            )
-            users.append(user)
-            db.add(user)
+                # Check organization_type is not None and role_type is not in EXCLUDE_ROLE_TYPE
+                if personnel.organization_type is None or personnel.role_type in EXCLUDE_ROLE_TYPE:
+                    is_internal = False
+                
+                # Store username in the set to track used names
+                used_usernames.add(personnel.external_username)
+                    
+                user = User(
+                    external_id=1000 + len(users),
+                    external_id_delete_flag=random.choice([True, False]),
+                    username=personnel.external_username,
+                    internal_user_flag=is_internal,  # Set based on our criteria
+                    created_at=fake.date_time_between(start_date='-2y', end_date='now')
+                )
+                users.append(user)
+                db.add(user)
+            db.commit()
         
-        # Add some external users (not in personnel system)
-        for i in range(200):
-            user = User(
-                external_id=1000 + len(users),
-                external_id_delete_flag=random.choice([True, False]),
-                username=fake.unique.user_name(),
-                internal_user_flag=False,  # External users
-                created_at=fake.date_time_between(start_date='-2y', end_date='now')
-            )
-            users.append(user)
-            db.add(user)
+        # Add external users (not in personnel system) - in batches
+        for batch_start in range(0, external_user_count, user_batch_size):
+            batch_end = min(batch_start + user_batch_size, external_user_count)
+            print(f"Generating external users batch {batch_start}-{batch_end} of {external_user_count}...")
+            
+            for i in range(batch_end - batch_start):
+                # Cycle through faker instances more frequently to avoid exhausting any single one
+                faker_idx = i % len(fake_others)
+                faker_instance = fake_others[faker_idx]
+                
+                # Create more variation in username generation
+                if i % 4 == 0:
+                    # Standard username
+                    base_username = faker_instance.user_name()
+                elif i % 4 == 1:
+                    # Username with digit suffix
+                    base_username = f"{faker_instance.first_name().lower()}_{random.randint(1, 9999)}"
+                elif i % 4 == 2:
+                    # Username with word
+                    base_username = f"{faker_instance.first_name().lower()}_{faker_instance.word()}"
+                else:
+                    # Completely custom pattern
+                    base_username = f"{faker_instance.lexify('??')}_{faker_instance.bothify('###?')}"
+                
+                # Ensure uniqueness by adding suffixes if needed
+                username = base_username
+                attempt = 0
+                while username in used_usernames:
+                    attempt += 1
+                    username = f"{base_username}_{attempt}"
+                    # If we're still having trouble, add more randomness
+                    if attempt > 5:
+                        username = f"{base_username}_{random.randint(1000, 9999)}"
+                
+                # Add to our tracking set
+                used_usernames.add(username)
+                
+                user = User(
+                    external_id=1000 + len(users),
+                    external_id_delete_flag=random.choice([True, False]),
+                    username=username,
+                    internal_user_flag=False,  # External users
+                    created_at=faker_instance.date_time_between(start_date='-2y', end_date='now')
+                )
+                users.append(user)
+                db.add(user)
+            db.commit()
         
-        db.commit()
+        print(f"Created {len(users)} user records")
 
-        # Generate Conversations (400 records)
+        # Generate Conversations (25000 records)
         print("Generating conversations...")
         conversations = []
-        for i in range(400):
-            user = random.choice(users)  # Randomly choosing a user
+        num_conversations = 25000
+        conv_batch_size = 1000
+        
+        for batch_start in range(0, num_conversations, conv_batch_size):
+            batch_end = min(batch_start + conv_batch_size, num_conversations)
+            print(f"Generating conversations {batch_start}-{batch_end} of {num_conversations}...")
             
-            # Set display_flag based on internal_user_flag
-            display_flag = user.internal_user_flag
+            for i in range(batch_start, batch_end):
+                user = random.choice(users)  # Randomly choosing a user
+                
+                # Set display_flag based on internal_user_flag
+                display_flag = user.internal_user_flag
+                
+                conversation = Conversation(
+                    external_id=2000 + i,
+                    user_id=user.external_id,  # Using the selected user's external_id
+                    topic=f"対話 {i+1}: {fake.sentence()}",
+                    created_at=fake.date_time_between(start_date='-3w', end_date=datetime.now() - timedelta(days=1)),
+                    model_id=random.choice([3, 4, 5]),
+                    display_flag=display_flag  # Set based on user's internal flag
+                )
+                conversations.append(conversation)
+                db.add(conversation)
             
-            conversation = Conversation(
-                external_id=2000 + i,
-                user_id=user.external_id,  # Using the selected user's external_id
-                topic=f"対話 {i+1}: {fake.sentence()}",
-                created_at=fake.date_time_between(start_date='-3w', end_date=datetime.now() - timedelta(days=1)),
-                model_id=random.choice([3, 4, 5]),
-                display_flag=display_flag  # Set based on user's internal flag
-            )
-            conversations.append(conversation)
-            db.add(conversation)
+            # Commit after each batch
+            db.commit()
+            # Clear conversations list to free memory after committing
+            conversations = []
+                
         db.commit()
+        print(f"Created {num_conversations} conversations")
 
-        # Generate Messages (2000 records, ~5 per conversation)
+        # Generate Messages (1,000,000 records)
         print("Generating messages...")
-        for conv in conversations:
-            # Generate 3-7 message pairs per conversation
-            pairs = random.randint(3, 7)
-            current_time = conv.created_at
+        message_count = 0
+        target_message_count = 1000000
+        messages_per_batch = 10000
+        
+        # Create a set to track used external_ids
+        used_message_ids = set()
+        
+        # Or use a counter as a guaranteed unique ID source
+        id_counter = itertools.count(10000000)
+        
+        # Calculate approximately how many messages per conversation we need
+        avg_messages_per_conversation = target_message_count // num_conversations
+        # Make sure it's an even number (for user-bot pairs)
+        if avg_messages_per_conversation % 2 == 1:
+            avg_messages_per_conversation += 1
+        
+        print(f"Target: ~{avg_messages_per_conversation} messages per conversation")
+        
+        # Fetch conversations in batches to save memory
+        for conv_batch_start in range(0, num_conversations, 1000):
+            conv_batch_end = min(conv_batch_start + 1000, num_conversations)
+            print(f"Fetching conversations {conv_batch_start}-{conv_batch_end}...")
             
-            # Randomly select a category for this conversation
-            category_choice = random.choice(insurance_categories)
-            _, category_group_label,_, main_category_label,_, chat_parameter_category_label = category_choice
+            # Get a batch of conversations from database
+            conv_batch = db.query(Conversation).filter(
+                Conversation.external_id >= (2000 + conv_batch_start),
+                Conversation.external_id < (2000 + conv_batch_end)
+            ).all()
             
-            for _ in range(pairs):
-                # User message
-                chat_params = {
-                    "temperature": round(random.uniform(0.1, 1.0), 2),
-                    "max_tokens": random.randint(50, 2000),
-                    "model": random.choice(["gpt-3.5-turbo-ja", "gpt-4-ja", "claude-3-sonnet-ja"])
-                }
+            for conv_idx, conv in enumerate(conv_batch):
+                # Skip if we've reached our target
+                if message_count >= target_message_count:
+                    break
+                    
+                # Report progress periodically
+                if conv_idx % 50 == 0:
+                    print(f"Generating messages for conversation batch {conv_batch_start+conv_idx}... Total messages so far: {message_count}")
                 
-                db.add(Message(
-                    external_id=fake.unique.random_number(digits=8),
-                    conversation_id=conv.external_id,
-                    message=fake.paragraph(),
-                    is_bot=False,
-                    chat_parameter=chat_params,
-                    # Add these required fields:
-                    main_category=main_category_label,
-                    category_group=category_group_label,
-                    chat_parameter_category=chat_parameter_category_label,
-                    created_at=current_time
-                ))
+                # Randomize messages per conversation around the average
+                pairs = max(2, min(100, int(random.normalvariate(avg_messages_per_conversation//2, 5))))
                 
-                # Bot response (5-30 seconds later)
-                current_time += timedelta(seconds=random.randint(30, 50))
-                db.add(Message(
-                    external_id=fake.unique.random_number(digits=8),
-                    conversation_id=conv.external_id,
-                    message=fake.paragraph(),
-                    is_bot=True,
-                    chat_parameter=chat_params,
-                    # Add these required fields:
-                    main_category=main_category_label,
-                    category_group=category_group_label,
-                    chat_parameter_category=chat_parameter_category_label,
-                    created_at=current_time
-                ))
+                current_time = conv.created_at
                 
-                # Add delay before next pair
-                current_time += timedelta(minutes=random.randint(1, 10))
+                # Randomly select a category for this conversation
+                category_choice = random.choice(insurance_categories)
+                _, category_group_label,_, main_category_label,_, chat_parameter_category_label = category_choice
+                
+                # Batch for this conversation
+                batch_msgs = []
+                
+                for _ in range(pairs):
+                    # User message
+                    chat_params = {
+                        "temperature": round(random.uniform(0.1, 1.0), 2),
+                        "max_tokens": random.randint(50, 2000),
+                        "model": random.choice(["gpt-3.5-turbo-ja", "gpt-4-ja", "claude-3-sonnet-ja"])
+                    }
+                    
+                    # Get a guaranteed unique ID using the counter
+                    external_id = next(id_counter)
+                    
+                    batch_msgs.append(Message(
+                        external_id=external_id,
+                        conversation_id=conv.external_id,
+                        message=fake.paragraph(),
+                        is_bot=False,
+                        chat_parameter=chat_params,
+                        main_category=main_category_label,
+                        category_group=category_group_label,
+                        chat_parameter_category=chat_parameter_category_label,
+                        created_at=current_time
+                    ))
+                    message_count += 1
+                    
+                    # Bot response (30-50 seconds later)
+                    current_time += timedelta(seconds=random.randint(30, 50))
+                    
+                    # Get next unique ID
+                    external_id = next(id_counter)
+                    
+                    batch_msgs.append(Message(
+                        external_id=external_id,
+                        conversation_id=conv.external_id,
+                        message=fake.paragraph(),
+                        is_bot=True,
+                        chat_parameter=chat_params,
+                        main_category=main_category_label,
+                        category_group=category_group_label,
+                        chat_parameter_category=chat_parameter_category_label,
+                        created_at=current_time
+                    ))
+                    message_count += 1
+                    
+                    # Add delay before next pair
+                    current_time += timedelta(minutes=random.randint(1, 10))
+                
+                # Add all messages for this conversation
+                for msg in batch_msgs:
+                    db.add(msg)
+                
+                # Commit every batch_size messages to avoid huge transactions
+                if message_count % messages_per_batch < len(batch_msgs):
+                    db.commit()
+                    print(f"Committed batch of messages. Total: {message_count}")
+                
+        # Final commit for any remaining messages
         db.commit()
+        print(f"Created {message_count} message records")
 
         print("Data generation completed successfully!")
 
