@@ -19,7 +19,6 @@ class Message(Base):
     )
     message: Mapped[str] = mapped_column(Text, nullable=False)
     is_bot: Mapped[bool] = mapped_column(Boolean, nullable=False, index=True)
-    chat_parameter: Mapped[dict] = mapped_column(JSON, nullable=False)
     main_category: Mapped[str] = mapped_column(String(255), nullable=True)
     category_group: Mapped[str] = mapped_column(String(255), nullable=True)
     chat_parameter_category: Mapped[str] = mapped_column(String(255), nullable=True)
