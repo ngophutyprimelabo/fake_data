@@ -5,10 +5,12 @@ from core.database import get_db, engine, Base
 from models import (
     User, Personnel, Organization, Conversation,
     Message, RoleType, EmployeeType,
-    FieldMapping, Abbreviation, CategoryMapping
+    FieldMapping, Abbreviation, CategoryMapping, Department
 )
 from value import role_type, employee_type, abbreviation, FIELD_MAPPING, insurance_categories, EXCLUDE_ROLE_TYPE
 import itertools
+import pandas as pd
+import os
 
 # Initialize Faker
 fake = Faker('ja_JP')
@@ -72,27 +74,53 @@ def generate_data():
                 db.add(Abbreviation(abbreviation=abbr))
         db.commit()
 
-        # Generate Organizations (100 records instead of 500)
+        # Load Department data from Excel file
+        print("Loading department data from Excel...")
+        excel_path = os.path.join(os.path.dirname(__file__), 'test.xlsx')
+        df_departments = pd.read_excel(excel_path)
+        
+        # Create Department records
+        print("Generating departments...")
+        departments = []
+        for _, row in df_departments.iterrows():
+            department = Department(
+                external_department_code=row['external_department_code'],
+                external_division_code=row['external_division_code'],  # Add this field
+                branch=row['branch'],
+                abbreviation=row['abbreviation']
+            )
+            departments.append(department)
+            db.add(department)
+        db.commit()
+        print(f"Created {len(departments)} department records")
+        
+        # Generate Organizations with references to departments
         print("Generating organizations...")
         organizations = []
+        # Get all department codes for reference
+        dept_codes = [dept.external_department_code for dept in departments]
+        
         for _ in range(100):
-            field_map = random.choice(FIELD_MAPPING)  # Random field mapping tuple
+            # Select a random department to associate with this organization
+            selected_dept = random.choice(departments)
+            field_map = random.choice(FIELD_MAPPING)
+            
             org = Organization(
-                external_department_code=fake.unique.bothify(text="?####"),
-                external_division_code=fake.bothify(text="###"),
+                external_department_code=selected_dept.external_department_code,
+                external_division_code=selected_dept.external_division_code,  # Use division code from department
                 external_section_code=fake.bothify(text="##"),
                 field=field_map[0],
                 field_detail=field_map[1],
                 region=random.choice(["東京", "大阪", "名古屋", "福岡", "札幌", "仙台", "広島", "京都"]),
-                branch=fake.city(),
-                abbreviation=random.choice(abbreviation),
+                branch=selected_dept.branch,
+                abbreviation=selected_dept.abbreviation,
                 created_at=fake.date_time_between(start_date='-2y', end_date='now')
             )
             organizations.append(org)
             db.add(org)
         db.commit()
         print(f"Created {len(organizations)} organizations")
-
+        
         # Generate Personnel (400 records instead of 5000)
         print("Generating personnel...")
         personnel_list = []
@@ -280,21 +308,18 @@ def generate_data():
         message_count = 0
         target_message_count = 10000
         messages_per_batch = 500
-        
-        # Create a set to track used external_ids
-        used_message_ids = set()
-        
-        # Or use a counter as a guaranteed unique ID source
+
+        # Use a counter as a guaranteed unique ID source
         id_counter = itertools.count(10000000)
-        
+
         # Calculate approximately how many messages per conversation we need
         avg_messages_per_conversation = target_message_count // num_conversations
         # Make sure it's an even number (for user-bot pairs)
         if avg_messages_per_conversation % 2 == 1:
             avg_messages_per_conversation += 1
-        
+
         print(f"Target: ~{avg_messages_per_conversation} messages per conversation")
-        
+
         # Fetch conversations in batches to save memory
         for conv_batch_start in range(0, num_conversations, 250):
             conv_batch_end = min(conv_batch_start + 250, num_conversations)
@@ -306,6 +331,7 @@ def generate_data():
                 Conversation.external_id < (2000 + conv_batch_end)
             ).all()
             
+            # Fix: Use enumerate to get index and conversation
             for conv_idx, conv in enumerate(conv_batch):
                 # Skip if we've reached our target
                 if message_count >= target_message_count:
@@ -329,13 +355,6 @@ def generate_data():
                 
                 for _ in range(pairs):
                     # User message
-                    chat_params = {
-                        "temperature": round(random.uniform(0.1, 1.0), 2),
-                        "max_tokens": random.randint(50, 2000),
-                        "model": random.choice(["gpt-3.5-turbo-ja", "gpt-4-ja", "claude-3-sonnet-ja"])
-                    }
-                    
-                    # Get a guaranteed unique ID using the counter
                     external_id = next(id_counter)
                     
                     batch_msgs.append(Message(
@@ -343,7 +362,6 @@ def generate_data():
                         conversation_id=conv.external_id,
                         message=fake.paragraph(),
                         is_bot=False,
-                        chat_parameter=chat_params,
                         main_category=main_category_label,
                         category_group=category_group_label,
                         chat_parameter_category=chat_parameter_category_label,
@@ -362,7 +380,6 @@ def generate_data():
                         conversation_id=conv.external_id,
                         message=fake.paragraph(),
                         is_bot=True,
-                        chat_parameter=chat_params,
                         main_category=main_category_label,
                         category_group=category_group_label,
                         chat_parameter_category=chat_parameter_category_label,
@@ -377,14 +394,15 @@ def generate_data():
                 for msg in batch_msgs:
                     db.add(msg)
                 
-                # Commit every batch_size messages to avoid huge transactions
-                if message_count % messages_per_batch < len(batch_msgs):
+                # Commit every batch_size messages
+                if message_count % messages_per_batch == 0:
                     db.commit()
                     print(f"Committed batch of messages. Total: {message_count}")
                 
-        # Final commit for any remaining messages
-        db.commit()
-        print(f"Created {message_count} message records")
+            # Commit any remaining messages after each conversation batch
+            if message_count % messages_per_batch != 0:
+                db.commit()
+                print(f"Committed final batch of messages. Total: {message_count}")
 
         print("Data generation completed successfully!")
 
@@ -517,7 +535,6 @@ def update_flags_based_on_types():
         db.close()
 
 if __name__ == "__main__":
-    # generate_data()
-    # Run validation to ensure all flags are properly set
-    # update_display_flags()
+    generate_data()
+    update_display_flags()
     update_flags_based_on_types()

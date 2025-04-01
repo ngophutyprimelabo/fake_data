@@ -2,8 +2,9 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from core.database import Base
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, column_property, mapped_column, relationship
+from sqlalchemy.dialects.mysql import LONGTEXT
 from sqlalchemy.sql import func, select, text
 
 
@@ -207,11 +208,12 @@ class Abbreviation(Base):
     abbreviation: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
 
 
-class Deparment(Base):
-    _tablename__ = "departments"
+class Department(Base):
+    __tablename__ = "departments"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     external_department_code: Mapped[str] = mapped_column(
         String(5), nullable=False
     )
+    external_division_code: Mapped[str] = mapped_column(String(3), nullable=False)
     branch: Mapped[str] = mapped_column(String(255), nullable=False)
     abbreviation: Mapped[str] = mapped_column(String(255), nullable=False)
